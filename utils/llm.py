@@ -1,6 +1,6 @@
 import requests
 import logging
-from config import get_config
+from utils.config import get_config
 
 # 翻译提示词
 TRANSLATION_SYSTEM_PROMPT = """

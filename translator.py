@@ -11,8 +11,8 @@ from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal, QObject
 from PyQt5.QtGui import QIcon, QFont, QCursor, QPixmap, QColor, QPainter, QBrush, QPen
 import time
 # 导入自定义模块
-from config import get_config, save_config
-from llm import translate_text
+from utils.config import get_config, save_config
+from utils.llm import translate_text
 
 # 配置日志
 logging.basicConfig(
@@ -387,11 +387,8 @@ if __name__ == "__main__":
         
         # 创建系统托盘图标
         tray_icon = QSystemTrayIcon()
-        
-        # 检查图标文件是否存在，不存在则创建
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translator_icon.png")
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./asset/translator_icon.png")
 
-        
         # 从本地读取图标
         app_icon = QIcon(icon_path)
         tray_icon.setIcon(app_icon)
@@ -423,13 +420,6 @@ if __name__ == "__main__":
         def on_translation_ready(text):
             # 先更新翻译窗口
             translation_window.text_display.setText(text)
-            # 然后显示托盘通知
-            tray_icon.showMessage(
-                "翻译完成", 
-                "结果已显示在小窗口中",
-                QSystemTrayIcon.Information, 
-                3000
-            )
         
         # 重新连接translation_ready信号
         signal_manager.translation_ready.disconnect()  # 断开原来的连接
