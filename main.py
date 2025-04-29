@@ -166,6 +166,7 @@ class ConfigWindow(QMainWindow):
         
         save_button = QPushButton("保存配置")
         save_button.setFixedWidth(150)
+        save_button.setFixedHeight(30)  # 减少按钮高度
         save_button.clicked.connect(self.save_config)
         button_layout.addWidget(save_button)
         
