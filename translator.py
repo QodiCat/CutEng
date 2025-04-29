@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QSystemTrayIcon, QMenu,
                             QLineEdit, QPushButton, QMessageBox, QTextEdit)
 from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal, QObject
 from PyQt5.QtGui import QIcon, QFont, QCursor, QPixmap, QColor, QPainter, QBrush, QPen
-
+import time
 # 导入自定义模块
 from config import get_config, save_config
 from llm import translate_text
@@ -23,56 +23,154 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
+def get_selected_text():
+    """获取当前选中的文本并进行处理"""
+    try:
+        old_clipboard = pyperclip.paste()
+        time.sleep(0.5)
+        keyboard.press_and_release('ctrl+c')
+        time.sleep(0.5)  # 增加更多等待时间
+        selected_text = pyperclip.paste()
+        pyperclip.copy(old_clipboard)
+        
+        return selected_text
+    except Exception as e:
+        logging.error(f"获取选中文本时出错: {str(e)}")
+        return None
 class SignalManager(QObject):
     translation_ready = pyqtSignal(str)
     copy_to_clipboard = pyqtSignal(str)
-    start_translation = pyqtSignal()
-    show_notification = pyqtSignal(str, str, object, int)  # 标题、内容、图标类型、显示时间
     show_window = pyqtSignal()
     set_translating = pyqtSignal()
     
 signal_manager = SignalManager()
 
 class ConfigWindow(QMainWindow):
+    """
+        点击设置跳出来的窗口
+    """
     def __init__(self):
         super().__init__()
         self.setWindowTitle("划词翻译 - 设置")
-        self.setFixedSize(400, 300)
+        self.setFixedSize(450, 400)  # 增加窗口高度
+        
+        # 设置窗口样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5f5f7;
+                border-radius: 10px;
+            }
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                color: #333333;
+                padding: 5px;
+            }
+            QLineEdit {
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                padding: 8px;
+                background-color: #ffffff;
+                selection-background-color: #0078d7;
+                font-size: 12px;
+                min-height: 25px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #0078d7;
+            }
+            QPushButton {
+                background-color: #0078d7;
+                color: white;
+                border-radius: 5px;
+                padding: 10px 15px;
+                font-weight: bold;
+                font-size: 14px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: #0063b1;
+            }
+            QPushButton:pressed {
+                background-color: #004e8c;
+            }
+            QGroupBox {
+                border: 1px solid #cccccc;
+                border-radius: 5px;
+                margin-top: 15px;
+                font-weight: bold;
+                background-color: #ffffff;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
         
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         
-        layout = QVBoxLayout(self.central_widget)
+        main_layout = QVBoxLayout(self.central_widget)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)  
+        
+        # 标题
+        title_label = QLabel("API 设置")
+        title_label.setStyleSheet("font-size: 18px; color: #0078d7; margin-bottom: 15px;")
+        title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+        
+        # 创建表单布局
+        form_layout = QVBoxLayout()
+        form_layout.setSpacing(20)  
         
         # URL设置
-        url_layout = QHBoxLayout()
+        url_layout = QVBoxLayout()
+        url_layout.setSpacing(8)  # 设置标签和输入框之间的间距
         url_label = QLabel("API Base URL:")
         self.url_input = QLineEdit()
+        self.url_input.setPlaceholderText("输入API的URL，例如: https://api.openai.com/v1")
         url_layout.addWidget(url_label)
         url_layout.addWidget(self.url_input)
-        layout.addLayout(url_layout)
+        form_layout.addLayout(url_layout)
         
         # API Key设置
-        key_layout = QHBoxLayout()
+        key_layout = QVBoxLayout()
+        key_layout.setSpacing(8)  # 设置标签和输入框之间的间距
         key_label = QLabel("API Key:")
         self.key_input = QLineEdit()
+        self.key_input.setPlaceholderText("输入您的API密钥")
+        self.key_input.setEchoMode(QLineEdit.Password)  # 密码模式显示
         key_layout.addWidget(key_label)
         key_layout.addWidget(self.key_input)
-        layout.addLayout(key_layout)
+        form_layout.addLayout(key_layout)
         
         # 模型设置
-        model_layout = QHBoxLayout()
+        model_layout = QVBoxLayout()
+        model_layout.setSpacing(8)  # 设置标签和输入框之间的间距
         model_label = QLabel("模型:")
         self.model_input = QLineEdit()
+        self.model_input.setPlaceholderText("输入模型名称，例如: gpt-3.5-turbo")
         model_layout.addWidget(model_label)
         model_layout.addWidget(self.model_input)
-        layout.addLayout(model_layout)
+        form_layout.addLayout(model_layout)
+        
+        main_layout.addLayout(form_layout)
+        
+        # 添加一些空间
+        main_layout.addStretch()
         
         # 保存按钮
-        save_button = QPushButton("保存")
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        save_button = QPushButton("保存配置")
+        save_button.setFixedWidth(150)
         save_button.clicked.connect(self.save_config)
-        layout.addWidget(save_button)
+        button_layout.addWidget(save_button)
+        
+        button_layout.addStretch()
+        main_layout.addLayout(button_layout)
         
         # 加载配置
         self.load_config()
@@ -103,13 +201,13 @@ class TranslationWindow(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setStyleSheet("""
             QWidget {
-                background-color: #FFFFFF;
+                background-color: #F5F5F5;
                 border-radius: 10px;
                 border: 1px solid #CCCCCC;
             }
             QTextEdit {
-                border: none;
-                background-color: transparent;
+                border: 5px solid #F5F5F5;
+                background-color: #F5F5F5;
                 font-size: 14px;
                 color: #333333;
             }
@@ -221,13 +319,16 @@ class TranslationWindow(QWidget):
         self.hide()
 
 def handle_hotkey():
+    """处理热键触发的翻译请求，从剪贴板获取文本"""
     try:
-        # 获取剪贴板中的选中文本
-        selected_text = pyperclip.paste()
-        logging.info(f"获取剪贴板内容: {'有内容' if selected_text else '无内容'}")
+        # 直接从剪贴板获取内容
+        selected_text = get_selected_text()
+        print("selected_text",selected_text)
+        logging.info(f"从剪贴板获取内容: {'有内容' if selected_text else '无内容'}")
         
         if selected_text and selected_text.strip():
-            # 通过信号在主线程中执行UI操作
+            # 在主线程中显示窗口和设置状态
+            # 这些信号应当只在主线程中触发和处理
             signal_manager.show_window.emit()
             signal_manager.set_translating.emit()
             
@@ -235,22 +336,23 @@ def handle_hotkey():
             def do_translation():
                 try:
                     result = translate_text(selected_text)
+                    # 通过信号更新翻译结果
                     signal_manager.translation_ready.emit(result)
-                    # 通过信号发送托盘通知
-                    signal_manager.show_notification.emit(
-                        "翻译完成", 
-                        f"原文: {selected_text[:20]}...\n结果已显示在小窗口中",
-                        QSystemTrayIcon.Information, 
-                        3000
-                    )
+                    # 不在线程中使用QSystemTrayIcon，改为设置一个标志
+                    logging.info("翻译完成")
                 except Exception as e:
                     logging.error(f"翻译线程中发生错误: {str(e)}")
                     signal_manager.translation_ready.emit(f"翻译过程中发生错误: {str(e)}")
             
-            threading.Thread(target=do_translation).start()
+            # 创建并启动线程
+            translation_thread = threading.Thread(target=do_translation)
+            translation_thread.daemon = True
+            translation_thread.start()
         else:
-            # 如果剪贴板为空，显示提示
-            signal_manager.show_notification.emit(
+            # 提示用户先复制文本
+            logging.warning("剪贴板中没有内容")
+            # 直接在主线程调用通知函数
+            tray_icon.showMessage(
                 "划词翻译", 
                 "剪贴板中没有文本，请先选中并复制(Ctrl+C)文本",
                 QSystemTrayIcon.Warning, 
@@ -258,29 +360,15 @@ def handle_hotkey():
             )
     except Exception as e:
         logging.error(f"热键处理过程中发生错误: {str(e)}")
-        signal_manager.show_notification.emit(
+        # 直接在主线程调用通知函数
+        tray_icon.showMessage(
             "划词翻译出错", 
             f"发生错误: {str(e)}",
             QSystemTrayIcon.Critical, 
             3000
         )
 
-def translate_clipboard():
-    """复制当前选中文本并直接翻译，一步完成划词翻译"""
-    # 模拟复制操作
-    keyboard.press_and_release('ctrl+c')
-    # 给剪贴板一点时间复制文本
-    # 使用Qt的计时器在主线程中执行
-    signal_manager.start_translation.emit()
 
-def monitor_clipboard():
-    while True:
-        try:
-            # 这个线程只是为了保持应用运行
-            import time
-            time.sleep(0.5)
-        except:
-            break
 
 if __name__ == "__main__":
     # 全局异常处理
@@ -300,31 +388,14 @@ if __name__ == "__main__":
         # 创建系统托盘图标
         tray_icon = QSystemTrayIcon()
         
-        # 创建一个简单的图标
-        pixmap = QPixmap(64, 64)
-        pixmap.fill(QColor(0, 0, 0, 0))  # 透明背景
+        # 检查图标文件是否存在，不存在则创建
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translator_icon.png")
+
         
-        # 在pixmap上绘制一个简单的图标
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # 绘制圆形背景
-        painter.setBrush(QBrush(QColor(52, 152, 219)))  # 蓝色背景
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(4, 4, 56, 56)
-        
-        # 绘制字母T
-        painter.setPen(QPen(QColor(255, 255, 255), 4))  # 白色粗笔
-        painter.drawLine(20, 20, 44, 20)  # 横线
-        painter.drawLine(32, 20, 32, 44)  # 竖线
-        
-        painter.end()
-        
-        # 创建图标并设置
-        app_icon = QIcon(pixmap)
+        # 从本地读取图标
+        app_icon = QIcon(icon_path)
         tray_icon.setIcon(app_icon)
         app.setWindowIcon(app_icon)
-        
         # 创建托盘菜单
         tray_menu = QMenu()
         
@@ -345,30 +416,38 @@ if __name__ == "__main__":
         config_action.triggered.connect(config_window.show)
         quit_action.triggered.connect(app.quit)
         signal_manager.copy_to_clipboard.connect(lambda text: pyperclip.copy(text))
-        signal_manager.start_translation.connect(lambda: QTimer.singleShot(100, handle_hotkey))
-        signal_manager.show_notification.connect(
-            lambda title, msg, icon, duration: tray_icon.showMessage(title, msg, icon, duration)
-        )
         signal_manager.show_window.connect(translation_window.show_at_cursor)
         signal_manager.set_translating.connect(lambda: translation_window.text_display.setText("正在翻译..."))
         
-        # 注册热键
-        # Alt+空格: 使用剪贴板中已有的内容翻译
-        keyboard.add_hotkey('alt+space', handle_hotkey)
-        # Alt+C: 一步完成选中、复制、翻译
-        keyboard.add_hotkey('alt+c', translate_clipboard)
+        # 添加翻译完成时的通知
+        def on_translation_ready(text):
+            # 先更新翻译窗口
+            translation_window.text_display.setText(text)
+            # 然后显示托盘通知
+            tray_icon.showMessage(
+                "翻译完成", 
+                "结果已显示在小窗口中",
+                QSystemTrayIcon.Information, 
+                3000
+            )
         
-        # 启动剪贴板监控线程
-        clipboard_thread = threading.Thread(target=monitor_clipboard)
-        clipboard_thread.daemon = True
-        clipboard_thread.start()
+        # 重新连接translation_ready信号
+        signal_manager.translation_ready.disconnect()  # 断开原来的连接
+        signal_manager.translation_ready.connect(on_translation_ready)
+        
+        # 注册热键 - 只使用win+空格
+        keyboard.add_hotkey('win+space', handle_hotkey)
+        # 启动剪贴板监控线程 感觉没有什么用？？？
+        # clipboard_thread = threading.Thread(target=monitor_clipboard)
+        # clipboard_thread.daemon = True
+        # clipboard_thread.start()
         
         # 启动时显示托盘提示
         tray_icon.showMessage(
             "划词翻译已启动", 
-            "划词方式1: 选中文本 → 复制(Ctrl+C) → Alt+空格\n划词方式2: 选中文本 → Alt+C",
+            "使用方法: 按Win+空格翻译",
             QSystemTrayIcon.Information, 
-            5000
+            300
         )
         
         sys.exit(app.exec_())
