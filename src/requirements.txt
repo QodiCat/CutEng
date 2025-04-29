@@ -1,0 +1,5 @@
+PyQt5>=5.15.0
+pyperclip>=1.8.0
+keyboard>=0.13.5
+Pillow>=8.0.0
+pyinstaller>=4.5.0 
