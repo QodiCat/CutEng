@@ -387,7 +387,7 @@ if __name__ == "__main__":
         
         # 创建系统托盘图标
         tray_icon = QSystemTrayIcon()
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./asset/translator_icon.png")
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "./assets/translator_icon.png")
 
         # 从本地读取图标
         app_icon = QIcon(icon_path)
