@@ -1,16 +1,18 @@
 import sys
 import os
-import json
-import keyboard
-import pyperclip
 import threading
-import requests
+import pyperclip
+import keyboard
 import logging
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QSystemTrayIcon, QMenu, 
                             QAction, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                             QLineEdit, QPushButton, QMessageBox, QTextEdit)
 from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal, QObject
-from PyQt5.QtGui import QIcon, QFont, QCursor, QPixmap, QColor
+from PyQt5.QtGui import QIcon, QFont, QCursor, QPixmap, QColor, QPainter, QBrush, QPen
+
+# 导入自定义模块
+from config import get_config, save_config
+from llm import translate_text
 
 # 配置日志
 logging.basicConfig(
@@ -21,13 +23,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-CONFIG_FILE = "config.json"
-DEFAULT_CONFIG = {
-    "api_base_url": "https://api.openai.com/v1",
-    "api_key": "",
-    "model": "gpt-3.5-turbo"
-}
 
 class SignalManager(QObject):
     translation_ready = pyqtSignal(str)
@@ -95,9 +90,11 @@ class ConfigWindow(QMainWindow):
             "model": self.model_input.text()
         }
         
-        save_config(config)
-        QMessageBox.information(self, "成功", "配置已保存")
-        self.close()
+        if save_config(config):
+            QMessageBox.information(self, "成功", "配置已保存")
+            self.close()
+        else:
+            QMessageBox.warning(self, "错误", "保存配置失败")
 
 class TranslationWindow(QWidget):
     def __init__(self):
@@ -223,66 +220,6 @@ class TranslationWindow(QWidget):
         event.ignore()
         self.hide()
 
-def get_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            return DEFAULT_CONFIG
-    else:
-        return DEFAULT_CONFIG
-
-def save_config(config):
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=4)
-
-def translate_text(text):
-    config = get_config()
-    api_base_url = config["api_base_url"]
-    api_key = config["api_key"]
-    model = config["model"]
-    
-    if not api_key:
-        logging.warning("API密钥未设置")
-        return "错误: 请先设置API密钥"
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-    
-    data = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": "你是一个翻译助手，请将用户输入的英文单词或短语翻译成中文，并提供简短的解释。"},
-            {"role": "user", "content": f"请翻译: {text}"}
-        ]
-    }
-    
-    try:
-        logging.info(f"开始翻译: {text[:30]}...")
-        response = requests.post(
-            f"{api_base_url.rstrip('/')}/v1/chat/completions", 
-            headers=headers, 
-            json=data, 
-            timeout=10
-        )
-        response.raise_for_status()
-        result = response.json()
-        translation = result["choices"][0]["message"]["content"]
-        logging.info("翻译成功")
-        return translation
-    except requests.exceptions.RequestException as e:
-        logging.error(f"API请求错误: {str(e)}")
-        return f"翻译出错: API请求失败\n{str(e)}"
-    except KeyError as e:
-        logging.error(f"API响应解析错误: {str(e)}")
-        return f"翻译出错: API响应格式异常\n{str(e)}"
-    except Exception as e:
-        logging.error(f"未知错误: {str(e)}")
-        return f"翻译出错: {str(e)}"
-
 def handle_hotkey():
     try:
         # 获取剪贴板中的选中文本
@@ -368,7 +305,6 @@ if __name__ == "__main__":
         pixmap.fill(QColor(0, 0, 0, 0))  # 透明背景
         
         # 在pixmap上绘制一个简单的图标
-        from PyQt5.QtGui import QPainter, QBrush, QPen
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
         
